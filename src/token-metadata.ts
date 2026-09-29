@@ -37,13 +37,17 @@ export class TokenMetadataBuilder {
   }
 
   inRange(tokenId: number): boolean {
-    return tokenId >= this.config.tokenIdStart && tokenId <= this.config.tokenIdEnd;
+    return (
+      tokenId >= this.config.tokenIdStart &&
+      tokenId <= this.config.tokenIdEnd
+    );
   }
 
   mappingStatus(): MappingStatus {
     if (!this.config.reveal.shuffle.enabled) {
       return { shuffle: "off", commitment: null };
     }
+
     return {
       shuffle: this.seed ? "ready" : "missing-seed",
       commitment: this.config.reveal.shuffle.commitment ?? null,
@@ -58,13 +62,24 @@ export class TokenMetadataBuilder {
    */
   async indexForToken(tokenId: number): Promise<number | null> {
     const position = tokenId - this.config.tokenIdStart;
-    if (position < 0 || position >= this.config.maxSupply) return null;
-    if (!this.config.reveal.shuffle.enabled) return position;
+
+    if (position < 0 || position >= this.config.maxSupply) {
+      return null;
+    }
+
+    if (!this.config.reveal.shuffle.enabled) {
+      return position;
+    }
+
     if (!this.seed) return null;
 
     if (!this.permutation) {
-      this.permutation = buildPermutation(this.seed, this.config.maxSupply);
+      this.permutation = buildPermutation(
+        this.seed,
+        this.config.maxSupply,
+      );
     }
+
     const permutation = await this.permutation;
     return permutation[position] ?? null;
   }
@@ -72,9 +87,15 @@ export class TokenMetadataBuilder {
   /** The real metadata, or null if we cannot produce it. */
   async revealed(tokenId: number): Promise<TokenMetadata | null> {
     const index = await this.indexForToken(tokenId);
+
     if (index === null) return null;
 
-    const entry = await this.source.get(index);
+    // Token #1 -> 1.json
+    // Token #2 -> 2.json
+    // ...
+    // Token #999 -> 999.json
+    const entry = await this.source.get(index + 1);
+
     if (!entry) return null;
 
     return this.applyBaseUri(entry);
@@ -86,30 +107,51 @@ export class TokenMetadataBuilder {
   }
 
   /**
-   * Prefix `imageBaseUri` onto media paths that are relative. Metadata that
-   * already carries full URIs passes through untouched.
+   * Prefix `imageBaseUri` onto media paths that are relative.
+   * Metadata that already carries full URIs passes through untouched.
    */
   private applyBaseUri(entry: TokenMetadata): TokenMetadata {
     const base = this.config.metadata.imageBaseUri;
+
     if (!base) return entry;
 
     const prefix = base.endsWith("/") ? base : `${base}/`;
+
     const out: TokenMetadata = { ...entry };
-    for (const field of ["image", "image_url", "animation_url"] as const) {
+
+    for (const field of [
+      "image",
+      "image_url",
+      "animation_url",
+    ] as const) {
       const value = out[field];
-      if (typeof value === "string" && value.length > 0 && !ABSOLUTE_URI.test(value)) {
+
+      if (
+        typeof value === "string" &&
+        value.length > 0 &&
+        !ABSOLUTE_URI.test(value)
+      ) {
         out[field] = prefix + value.replace(/^\/+/, "");
       }
     }
+
     return out;
   }
 }
 
 /** Substitute {tokenId} in every string of the placeholder. */
-function fillTemplates(value: TokenMetadata, tokenId: number): TokenMetadata {
+function fillTemplates(
+  value: TokenMetadata,
+  tokenId: number,
+): TokenMetadata {
   const out: TokenMetadata = {};
+
   for (const [key, raw] of Object.entries(value)) {
-    out[key] = typeof raw === "string" ? raw.replaceAll("{tokenId}", String(tokenId)) : raw;
+    out[key] =
+      typeof raw === "string"
+        ? raw.replaceAll("{tokenId}", String(tokenId))
+        : raw;
   }
+
   return out;
 }

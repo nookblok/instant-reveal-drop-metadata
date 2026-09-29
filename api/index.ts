@@ -1,9 +1,5 @@
 /**
- * Vercel entry point. `vercel.json` rewrites every path here, so /1234 and
- * /status both land in this function.
- *
- * Vercel has no R2, so use metadata.source "bundled" or "http" when deploying
- * here.
+ * Vercel entry point.
  */
 
 import { config as dropConfig } from "../drop.config.ts";
@@ -16,21 +12,39 @@ export const config = { runtime: "nodejs" };
 let runtime: Runtime | null = null;
 let initError: Error | null = null;
 
-export default async function handler(request: Request): Promise<Response> {
+export default async function handler(
+  request: Request,
+): Promise<Response> {
   if (!runtime && !initError) {
     try {
-      runtime = createRuntime({ config: dropConfig, env: envFromRecord(process.env) });
+      runtime = createRuntime({
+        config: dropConfig,
+        env: envFromRecord(process.env),
+      });
     } catch (error) {
-      initError = error instanceof Error ? error : new Error(String(error));
+      initError =
+        error instanceof Error
+          ? error
+          : new Error(String(error));
     }
   }
 
   if (initError) {
     return new Response(
-      `${JSON.stringify({ error: "configuration problem", detail: initError.message }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          error: "configuration problem",
+          detail: initError.message,
+        },
+        null,
+        2,
+      )}\n`,
       {
         status: 500,
-        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        },
       },
     );
   }
